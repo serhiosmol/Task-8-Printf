@@ -1,4 +1,6 @@
 1-nasm
 2-nasm
+3-nasm
+printf
 *.lst
 *.o
