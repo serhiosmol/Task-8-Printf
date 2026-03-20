@@ -25,13 +25,22 @@ _start:
 
 ; my_printf(const char* format, ...)
 ; rdi - ptr on fmt_string, rsi - expected char
-; rbx - address for loop, r12 - constant storage for char code
+; rbx - address for loop (string), r12 - changing rsp
 my_printf:
 	push r9
 	push r8
 	push rcx
 	push rdx
 	push rsi
+
+	; after that stack looks like that
+	; (registers mean chars in them):
+	; rsi rdx rcx r8 r9 RETURN_ADDRESS 'y' ...
+	; /\
+	; rsp in the beginning
+	; we don't need to return symbols to registers
+	; so we will just jump over return address
+	; and change rsp in the end of executing function
 
 	mov rbx, rdi
 	mov r12, rsp
