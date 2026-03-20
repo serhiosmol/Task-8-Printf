@@ -16,3 +16,15 @@ And dividely:
 nasm -f elf64 -l printf.lst printf.s
 ld -s -o printf printf.o
 ```
+
+For debugging you can use edb (GUI debugger based on gdb).
+Install:
+```shell
+sudo apt update -y
+sudo apt install edb-debugger
+```
+Use:
+```shell
+edb --run ./printf
+```
+
