@@ -1,9 +1,6 @@
-#include <stdio.h>
-
-extern int my_printf(char*, ...);
+extern int printf(char*, ...);
 
 int main()
 {
-    my_printf("%s%c", "Hello, World", '!');
-    return 0;
+    return printf("%s%c, %c, %c, %c, %c, %c, %c\n", "Hello, d", '!', 'a', 'b', 'c', 'e', 'f', 'g');
 }

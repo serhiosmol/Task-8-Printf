@@ -4,3 +4,4 @@
 printf
 *.lst
 *.o
+main
