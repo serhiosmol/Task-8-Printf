@@ -1,6 +1,6 @@
 global printf
 
-; convert int of base 2, 4, 8, 10, 16 to str
+; convert int of base 2-36
 ; args: %1: integer, %2: target buffer, %3: power
 ; ret: rax: bytes written
 %macro int2str 3
@@ -16,21 +16,24 @@ global printf
 	neg rax
 %%lp:	test rax, rax		; 0?
 	jz %%lpq
-%if %3 = 2 || %3 == 4 || %3 == 8 || %3 == 16
+; Don't use div for powers of 2
+%if %3 = 2 || %3 = 4 || %3 = 8 || %3 = 16
 	mov rdx, rax
 	and rdx, %3 - 1		; current digit
-%if %3 == 2
+%if %3 = 2
 	shr rax, 1
-%elif %3 == 4
+%elif %3 = 4
 	shr rax, 2
-%elif %3 == 8
+%elif %3 = 8
 	shr rax, 3
-%elif %3 == 16
+%elif %3 = 16
 	shr rax, 4
+%elif %3 = 32
+	shr rax, 5
 %endif
-%elif %3 = 10
-	mov r8, 10		; base -> r8 for division
-	xor rdx, rdx
+%elif 3 <= %3 && %3 <= 36
+	mov r8, %3		; base -> r8 for division
+	xor rdx, rdx		; := 0
 	div r8
 %else
   %error Base of %3 is not supported.
@@ -63,6 +66,28 @@ global printf
 section .bss
 outbuf	resb 256
 
+section .rodata
+
+index:	times 'b' db 255
+	db 0
+	db 1
+	db 2
+	times ('o' - 'd' - 1) db 255
+	db 3
+	times ('s' - 'o' - 1) db 255
+	db 4
+	times ('x' - 's' - 1) db 255
+	db 5
+	times (256 - 'x' - 1) db 255
+
+align 8
+jmptbl:	dq bin - jmptbl
+	dq char - jmptbl
+	dq dec - jmptbl
+	dq oct - jmptbl
+	dq str - jmptbl
+	dq hex - jmptbl
+
 section .text
 printf:
 ; Push args to the stack for convenience
@@ -71,74 +96,75 @@ printf:
 	push rcx
 	push rdx
 	push rsi
-
-	lea r12, [rsp]		; current argument pointer
+	push rbp
+	lea rbp, [rsp + 8]	; current argument pointer
+	push r13
+	push r14
+	push rbx
+	
 	lea r13, [rel outbuf] 	; ptr on char in outbuf
 	xor r14, r14		; counter of %
-.loop:	mov al, [rdi]		; store current char
+loop:	mov al, [rdi]		; store current char
 	test al, al		; end of string?
-	je .write		; we've done
+	je write		; we've done
 
 	cmp al, '%'		; is it %?
-	jne .default
+	jne l_default
 
 ; We've met a start of control sequence, let's check what follows it
 	inc rdi
 	mov al, [rdi]		; the char after %
+	cmp al, '%'
+	je pct
+swtch:	movzx rbx, al
+	lea rdx, [rel index]
+	mov al, [rdx + rbx]
+	cmp al, 255
+	je l_default
+	
+	movzx rax, al
+	lea rdx, [rel jmptbl]
+	mov rbx, [rdx + 8 * rax]
+	add rdx, rbx
+	jmp rdx
 
-	cmp al, 'c'		; char?
-	je .char
-
-	cmp al, 's'		; string?
-	je .str
-
-	cmp al, 'b'		; binary?
-	je .bin
-
-	cmp al, 'o'		; oct?
-	je .oct
-
-	cmp al, 'x'		; oct?
-	je .hex
-
-	cmp al, 'd'		; decimal?
-	je .dec
-
-	jmp .default
-.char:	mov rax, [r12]		; the char will be copied to the output
-	jmp .next_arg		; buffer before the next loop iteration
-.bin:	int2str qword [r12], r13, 2	; bytes written -> rax
+	jmp l_default
+pct:	mov rax, '%'
+	jmp l_default
+char:	mov rax, [rbp]		; the char will be copied to the output
+	jmp next_arg		; buffer before the next loop iteration
+bin:	int2str qword [rbp], r13, 2	; bytes written -> rax
 	add r13, rax
-	jmp .next_arg
-.oct:	int2str qword [r12], r13, 8
+	jmp next_arg
+oct:	int2str qword [rbp], r13, 8
 	add r13, rax
-	jmp .next_arg
-.hex:	int2str qword [r12], r13, 16
+	jmp next_arg
+hex:	int2str qword [rbp], r13, 16
 	add r13, rax
-	jmp .next_arg
-.dec:	int2str qword [r12], r13, 10
+	jmp next_arg
+dec:	int2str qword [rbp], r13, 10
 	add r13, rax
-	jmp short .next_arg
-.str:	mov rsi, [r12]		; string start address -> rsi
-.copy:	mov al, [rsi]
+	jmp short next_arg
+str:	mov rsi, [rbp]		; string start address -> rsi
+copy:	mov al, [rsi]
 	test al, al		; end of string?
-	je .next_arg
+	je next_arg
 	mov [r13], al
 	inc r13			; inc the bytes written
 	inc rsi			; next char in the string
-	jmp short .copy
-.next_arg:
-	add r12, 8		; next from the stack
+	jmp short copy
+next_arg:
+	add rbp, 8		; next from the stack
 	inc r14			; inc count of wrote args
 	cmp r14, 5
-	jne .default
-	add r12, 8
-.default:
+	jne l_default
+	add rbp, 8		; skip return address, we've readched [rsp]
+l_default:
 	mov [r13], al		; add char to output buffer
 	inc r13			; next char in output buffer
 	inc rdi			; next char in format string
-	jmp .loop		; continue string processing
-.write:	mov rax, 1		; write syscall
+	jmp loop		; continue string processing
+write:	mov rax, 1		; write syscall
 	mov rdi, 1		; stdout
 	lea rsi, [rel outbuf]	; outbuf
 	mov rdx, r13
@@ -147,5 +173,9 @@ printf:
 	syscall
 	
 	pop rax			; return chars printed
+	pop rbx
+	pop r14
+	pop r13
+	pop rbp
 	add rsp, 5 * 8		; we've appended 5 args earlier
 	ret

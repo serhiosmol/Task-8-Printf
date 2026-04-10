@@ -2,7 +2,6 @@ extern int printf(char*, ...);
 
 int main()
 {
-    printf("%s, %c, %d, %b, %o, %x\n", "Sergey", 'x', 255, 255,
-		  255, 255);
+    printf("%s %b, %o, %d, %x %s%c\n", "My name is Sergey, I am", 18, 18, 18, 18, "years old", '.');
     return 0;
 }
