@@ -2,5 +2,7 @@ extern int printf(char*, ...);
 
 int main()
 {
-    return printf("%s%c, %c, %c, %c, %c, %c, %c\n", "Hello, d", '!', 'a', 'b', 'c', 'e', 'f', 'g');
+    printf("%s, %c, %d, %b, %o, %x\n", "Sergey", 'x', 255, 255,
+		  255, 255);
+    return 0;
 }
